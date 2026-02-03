@@ -11,20 +11,19 @@ Rather than presenting a production-ready security system, this project focuses 
 -CyberShield is intentionally designed as an experimental testbed to analyze this question through systematic evaluation.
 
 ##System Architecture
-###CyberShield employs a dual-model detection pipeline to separate anomaly identification from attack classification:
+1.CyberShield employs a dual-model detection pipeline to separate anomaly identification from attack classification:
 -Isolation Forest (Unsupervised)
 Used to identify anomalous network behavior without reliance on labeled attack data.
-=Random Forest (Supervised)
+=Random Forest (Random Forest (Supervised, trained on SMOTE-balanced data)
 Used for intrusion detection and attack category prediction on labeled traffic.
 
-###Model predictions are combined with:
+2.Model predictions are combined with:
 -a configurable confidence threshold (θ)
 -feature-level traffic constraints (rate, byte volume, TTL, duration)
 
 This layered decision logic enables controlled experimentation on detection sensitivity and false-positive behavior.
 
 ##Attack Categories
-
 The system evaluates traffic across the following categories:
 -Normal
 -DDoS
@@ -41,6 +40,7 @@ The system evaluates traffic across the following categories:
 -Evaluation mode: Controlled experimental analysis
 -Objective: Stability and error behavior, not raw accuracy
 -All experiments were conducted using fixed train–test splits to ensure comparability across thresholds.
+-To address class imbalance in the labeled training data, Synthetic Minority Over-sampling Technique (SMOTE) was applied only on the training split. This was used to improve minority-class representation during supervised learning while preserving an unbiased test distribution for evaluation.
 
 ##Threshold Sensitivity Experiment
 A systematic threshold sensitivity analysis was performed by evaluating multiple confidence thresholds between θ = 0.10 and θ = 0.85.
@@ -63,3 +63,48 @@ This result demonstrates that commonly used default thresholds are suboptimal fo
 -False Positive Rate: ~4.1%
 
 These metrics reflect a balanced tradeoff between detection sensitivity and false alarm control.
+
+##Error Analysis
+To understand model behavior beyond aggregate metrics, CyberShield includes explicit error decomposition.
+
+1.False Negatives (Missed Attacks)
+Total: 5,432
+-Predominantly associated with:
+-Fuzzers (87.9%)
+-Exploit-based attacks
+-Shellcode traffic
+
+2.False Positives (False Alarms)
+-Total: 7,254
+-Concentrated in:
+-TCP traffic
+-UDP traffic
+
+This analysis highlights how attack type and protocol characteristics influence misclassification, reinforcing the need for threshold calibration in applied security ML systems.
+
+##Interactive Analysis Interface
+-An interactive Gradio-based dashboard is provided to support exploratory analysis:
+-CSV-based traffic input
+-Real-time adjustment of confidence thresholds
+-Visualization of predictions, confidence scores, and error distributions
+-The interface is intended for experimental exploration, not live deployment.
+
+##Reproducibility
+This project is fully reproducible and can be executed locally.
+1.Local Execution
+git clone https://huggingface.co/spaces/sarikasingh02z/CyberShield
+cd CyberShield
+pip install -r requirements.txt
+python app.py
+
+##Limitations
+-The system is evaluated under controlled experimental conditions.
+-No live packet capture or production deployment is performed.
+-Thresholds are optimized for the evaluated dataset and may not generalize across networks.
+-These limitations are intentional and align with the project’s scope.
+
+##Author
+**Sarika Singh**
+Applied Machine Learning.Anomaly Detection.Cybersecurity
+
+

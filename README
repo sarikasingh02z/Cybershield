@@ -1,5 +1,5 @@
-##CyberShield NIDS
-###Experimental Network Intrusion Detection System using Machine Learning
+**CyberShield NIDS**
+**Experimental Network Intrusion Detection System using Machine Learning**
 
 ##Overview
 CyberShield is an experimental, research-oriented Network Intrusion Detection System (NIDS) that investigates how threshold tuning and error analysis affect detection reliability in machine learning–based security systems under imbalanced network traffic.

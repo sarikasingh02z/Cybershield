@@ -1,110 +1,117 @@
 **CyberShield NIDS**
-**Experimental Network Intrusion Detection System using Machine Learning**
+Experimental Network Intrusion Detection System — Dual-Guard ML Architecture
 
-##Overview
-CyberShield is an experimental, research-oriented Network Intrusion Detection System (NIDS) that investigates how threshold tuning and error analysis affect detection reliability in machine learning–based security systems under imbalanced network traffic.
-Rather than presenting a production-ready security system, this project focuses on methodological evaluation, controlled experimentation, and interpretability of model behavior, which are critical for applied machine learning research in cybersecurity.
+**Overview**
+CyberShield is an experimental, research-oriented Network Intrusion Detection System (NIDS) that investigates how confidence threshold tuning affects detection reliability in a dual-model machine learning pipeline trained on imbalanced network traffic.
+Rather than presenting a production-ready security system, this project focuses on:
 
-##Research Motivation
--Machine learning–based intrusion detection systems often report strong accuracy in offline evaluation, yet default decision thresholds frequently lead to unstable performance, excessive false positives, or missed attacks in realistic traffic distributions.
--Research Question: How does confidence threshold tuning influence false-positive rates and detection stability in a dual-model intrusion detection system trained on imbalanced network traffic?
--CyberShield is intentionally designed as an experimental testbed to analyze this question through systematic evaluation.
+-Systematic threshold sensitivity analysis using cross-validation
+-Honest evaluation of supervised vs unsupervised anomaly detection
+-Understanding when and why default thresholds fail on imbalanced data
+-Interpretable dual-guard inference architecture
 
-##System Architecture
-1.CyberShield employs a dual-model detection pipeline to separate anomaly identification from attack classification:
--Isolation Forest (Unsupervised)
-Used to identify anomalous network behavior without reliance on labeled attack data.
-=Random Forest (Random Forest (Supervised, trained on SMOTE-balanced data)
-Used for intrusion detection and attack category prediction on labeled traffic.
+**Research Question**
 
-2.Model predictions are combined with:
--a configurable confidence threshold (θ)
--feature-level traffic constraints (rate, byte volume, TTL, duration)
-
-This layered decision logic enables controlled experimentation on detection sensitivity and false-positive behavior.
-
-##Attack Categories
-The system evaluates traffic across the following categories:
--Normal
--DDoS
--Port Scan
--Brute Force
--Spoofing
--Data Exfiltration
--Slow Attack
--Fast Flux
-
-##Experimental Setup
--Total samples: 175,341 network flows
--Traffic distribution: Highly imbalanced
--Evaluation mode: Controlled experimental analysis
--Objective: Stability and error behavior, not raw accuracy
--All experiments were conducted using fixed train–test splits to ensure comparability across thresholds.
--To address class imbalance in the labeled training data, Synthetic Minority Over-sampling Technique (SMOTE) was applied only on the training split. This was used to improve minority-class representation during supervised learning while preserving an unbiased test distribution for evaluation.
-
-##Threshold Sensitivity Experiment
-A systematic threshold sensitivity analysis was performed by evaluating multiple confidence thresholds between θ = 0.10 and θ = 0.85.
-
-###Results Summary
-Threshold     	|F1 Score
-0.50 (default)	| 93.34%
-0.30 (optimized)|94.73%
-
--Improvement: +1.39% F1 score
--Selected operational threshold: θ = 0.30
-
-This result demonstrates that commonly used default thresholds are suboptimal for imbalanced intrusion detection tasks.
-
-##Optimized Performance Metrics (θ = 0.30)
--Accuracy: 92.76%
--Precision: 94.01%
--Recall: 95.45%
--F1 Score: 94.73%
--False Positive Rate: ~4.1%
-
-These metrics reflect a balanced tradeoff between detection sensitivity and false alarm control.
-
-##Error Analysis
-To understand model behavior beyond aggregate metrics, CyberShield includes explicit error decomposition.
-
-1.False Negatives (Missed Attacks)
-Total: 5,432
--Predominantly associated with:
--Fuzzers (87.9%)
--Exploit-based attacks
--Shellcode traffic
-
-2.False Positives (False Alarms)
--Total: 7,254
--Concentrated in:
--TCP traffic
--UDP traffic
-
-This analysis highlights how attack type and protocol characteristics influence misclassification, reinforcing the need for threshold calibration in applied security ML systems.
-
-##Interactive Analysis Interface
--An interactive Gradio-based dashboard is provided to support exploratory analysis:
--CSV-based traffic input
--Real-time adjustment of confidence thresholds
--Visualization of predictions, confidence scores, and error distributions
--The interface is intended for experimental exploration, not live deployment.
-
-##Reproducibility
-This project is fully reproducible and can be executed locally.
-1.Local Execution
-git clone https://huggingface.co/spaces/sarikasingh02z/CyberShield
-cd CyberShield
-pip install -r requirements.txt
-python app.py
-
-##Limitations
--The system is evaluated under controlled experimental conditions.
--No live packet capture or production deployment is performed.
--Thresholds are optimized for the evaluated dataset and may not generalize across networks.
--These limitations are intentional and align with the project’s scope.
-
-##Author
-**Sarika Singh**
-Applied Machine Learning.Anomaly Detection.Cybersecurity
+How does confidence threshold tuning influence false-positive rates and detection stability in a dual-model intrusion detection system trained on imbalanced network traffic?
 
 
+**Architecture — Dual-Guard Detection**
+
+**Guard 1 — Random Forest**
+
+-Trained on labeled flows, knows what past attacks look like
+-Returns attack probability for every packet
+-If probability ≥ θ → ATTACK, stop, flag immediately
+-Precision 98% — when it says attack it is almost always right
+-Weakness: misses attacks that look like normal traffic statistically
+
+**Guard 2 — Isolation Forest**
+
+-Trained on normal traffic only, never seen an attack label
+-Learned what normal looks like, not what attacks look like
+-Returns an anomaly score — more negative = more unusual
+-Does not make a binary decision, score only
+-Only evaluated on packets Guard 1 passed as normal
+
+**Score interpretation**
+
+-Below p10 → HIGH suspicion (bottom 10% most anomalous of normal pool)
+-Between p10 and p25 → MEDIUM suspicion
+-Above p25 → LOW, both guards agree, likely clean
+
+**The interesting case**
+
+Guard 1 says NORMAL + Guard 2 score is strongly negative = zero-day candidate
+Guard 1 does not recognise it as a known pattern
+Guard 2 says it looks nothing like normal traffic
+Neither alone catches it, the combination flags it
+
+**Dataset**
+UNSW-NB15 — synthesised network traffic dataset from the Australian Centre for Cyber Security.
+-Training set has 82,332 flows. 44.9% are normal traffic, 55.1% are attacks — so the training data is slightly attack-heavy, not the class imbalance direction most people assume when they hear "imbalanced dataset."
+-Test set has 175,341 flows — more than double the training set. 31.9% normal, 68.1% attacks. The test set is more attack-heavy than training, which means the model is evaluated on a harder distribution than it was trained on.
+
+45 raw features, 15 selected for modelling
+Attack categories: Fuzzers, Exploits, DoS, Reconnaissance, Backdoor, Shellcode, Generic, Analysis
+Binary label: 0 = Normal, 1 = Attack
+
+
+No SMOTE — dataset imbalance is moderate (~55/45). class_weight='balanced' handles it without synthetic data that could distort the decision boundary
+LabelEncoder fit on train only — prevents category code mismatch between train and test
+IF trained on normal-only samples — learns normal traffic boundary, not the full distribution
+Contamination = auto — avoids the hard limit issue; decision_function() scores used at inference, not predict()
+
+
+Threshold Sensitivity Analysis
+The core research contribution. Confidence threshold directly controls the precision/recall tradeoff in binary classification.
+Method
+
+Split training data into 5 stratified folds
+For each fold: train RF, collect validation probabilities, sweep θ from 0.10 to 0.85
+Average F1 across folds per threshold → select best θ
+Apply CV-selected threshold to held-out test set once
+
+Test set F1 at default θ=0.50: 92.94%
+Test set F1 at CV-optimal θ=0.45: 93.32% (+0.38%)
+
+Threshold was selected on validation folds only. Test set used once for final reporting.
+
+**Finding**
+Default thresholds are suboptimal for imbalanced intrusion detection. A well-tuned threshold on a moderately complex model beats a default threshold on a more complex model — and the tuning cost is near zero compared to architectural changes.
+
+**Results**
+
+Guard 1 — Random Forest (Default θ=0.50)
+MetricValueAccuracy90.88%Precision98.28%Recall88.15%F1-Score92.94%ROC-AUC0.9856PR-AUC0.9925Missed Attacks (FN)14,145 (11.9%)False Alarms (FP)1,840 (3.3%)
+Threshold Optimisation (CV-Validated)
+ValueDefault θ=0.50 F192.94%CV-Optimal θ0.45Optimised F193.32%Improvement+0.38%CV Mean F1 at θ=0.4594.59% ± 0.15% (5-fold)
+Methodology: Threshold selected using 5-fold StratifiedKFold on training data only. The optimal threshold was applied to the held-out test set once. The test set was never used during threshold selection — the improvement claim is not inflated by test-set optimisation.
+**Key Finding**
+-Default threshold (θ=0.50) is suboptimal for this task. The CV-selected threshold (θ=0.45) improves F1 by +0.38% by better balancing the precision-recall tradeoff on imbalanced network traffic. The improvement is modest but reproducible and methodologically sound — consistent with literature on threshold calibration in imbalanced classification.
+-The CV sweep also reveals that F1 is relatively stable between θ=0.40 and θ=0.55 (all within 0.002 of each other), which means the system is not highly sensitive to small threshold changes in this range. Below θ=0.30 recall increases sharply but precision drops significantly.
+
+**Dual-Guard System**
+**Guard 2** contribution at p10 cutoff: Recovered 1,039 attacks (7.3% of Guard 1 misses) at the cost of 5,791 new false alarms. Recovery ratio: 0.18 attacks per false alarm.
+This confirms that IF as a hard binary second-stage filter is not beneficial on this dataset — the feature space overlap between normal and attack traffic is too high. Guard 2 is therefore retained as an anomaly score signal only, not a decision layer.
+
+**Five-tab interactive interface:**
+-Real-Time Detection: Adjust packet sliders or pick an attack template. Guard 1 gives ATTACK/NORMAL + confidence.Guard 2 gives anomaly score + suspicion level (LOW/MEDIUM/HIGH). Combined interpretation flags zero-day candidates.
+-Threshold Tuning: Adjust θ live. See CV-optimal value and how the current setting compares. Changes apply immediately to all inference.
+-Batch Analysis: Upload a CSV of network flows. Real model runs inference on every row. Returns RF prediction, probability, IF score, and suspicion level per row. Downloads full results CSV.
+-Error Analysis: Loads real metrics from the saved model package. Shows confusion matrix, threshold sensitivity curve (CV-validated), ROC curve, and IF score distribution. No hardcoded numbers.
+-System Information: Architecture diagram, guard descriptions, research finding summary, honest limitations.
+
+Limitations
+These are intentional constraints, not oversights:
+
+-No live packet capture — demo interface only, not a production NIDS
+-Single dataset — thresholds optimised for UNSW-NB15 may not generalise to other networks
+-Binary classification only — attack categories are inferred from rules, not from a multiclass model
+-IF as score signal only — Isolation Forest was evaluated as a binary second-stage filter and found to introduce an unfavourable false-alarm-to-recovery ratio on this dataset (feature space overlap too high). It is retained as an anomaly score indicator
+-Simulated traffic only — attack templates use hand-crafted parameter values, not real captured traffic
+
+
+
+
+Tech Stack
+Pandas, NumPy,Scikit-learn (RandomForestClassifier, IsolationForest),Scikit-learn metrics, cross-validation,Matplotlib, Seaborn, Gradio,Joblib

@@ -1,5 +1,4 @@
 # CyberShield NIDS — Dependencies
-# Install with: pip install -r requirements.txt
  
 # Core
 numpy>=1.21.0
